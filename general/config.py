@@ -16,7 +16,7 @@ class Config(BaseSettings):
     CONSOLE_ENABLED: bool
 
     class Config:
-        env_file = ".env"
+        env_file = "~/.config/ace-of-spades/.env"
         env_file_encoding = "utf-8"
 
 
