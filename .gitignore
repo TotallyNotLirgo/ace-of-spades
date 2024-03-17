@@ -1,5 +1,5 @@
 .venv
-__pycache__*
+__pycache__
 log.txt
-*.db
-
+.env
+certificates

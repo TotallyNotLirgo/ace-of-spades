@@ -1,9 +1,9 @@
 from functools import lru_cache
-from pydantic_settings import BaseSettings
+from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
-class Config(BaseSettings):
-    API_URL: str
+class Config(BaseSettings, extra="ignore"):
+    API_HOST: str
     API_PORT: int
     DEVELOPMENT_MODE: bool
     DATABASE_URL: str
@@ -15,9 +15,15 @@ class Config(BaseSettings):
     LOG_FILE: str
     CONSOLE_ENABLED: bool
 
-    class Config:
-        env_file = "~/.config/ace-of-spades/.env"
-        env_file_encoding = "utf-8"
+    MARIADB_HOST: str
+    MARIADB_USER: str
+    MARIADB_PASSWORD: str
+    MARIADB_DATABASE: str
+
+    model_config = SettingsConfigDict(
+        env_file=".env",
+        env_file_encoding="utf-8",
+    )
 
 
 @lru_cache()

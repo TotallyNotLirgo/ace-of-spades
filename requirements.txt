@@ -1,1 +1,5 @@
-pydantic-settings==2.0.2
+pydantic-settings==2.2.1
+uvicorn==0.28.0
+fastapi==0.110.0
+aiomysql==0.2.0
+email_validator==2.1.1

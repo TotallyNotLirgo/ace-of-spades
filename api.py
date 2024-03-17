@@ -1,72 +1,30 @@
-from fastapi import FastAPI, Request, status, HTTPException
-from fastapi.exceptions import RequestValidationError
-from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse
-import logging
-from general.logger import init_logger
-from endpoints.schemas.general import APIError
+from logging import getLogger
+
+from fastapi import FastAPI
+from fastapi.exceptions import HTTPException, RequestValidationError
+
+from api_config import API_INFO, CORS_CONFIG, ExceptionHandlers
 from general.config import get_config
-from endpoints import user
+from general.logger import init_logger
+import users.endpoints as users
 
-# ________ INITIALIZATION ________ #
-
-init_logger()
-logger = logging.getLogger(__name__)
-
-app = FastAPI()
 config = get_config()
-logger.info("Starting API")
+init_logger(config.LOG_LEVEL, config.LOG_FILE, config.CONSOLE_ENABLED)
+logger = getLogger(__name__)
 
-app.include_router(user.router)
-
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=[config.FRONTEND_URL],
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
+logger.info("Starting Ace of Spades API")
+logger.info(
+    f"Documentation: https://{config.API_HOST}:{config.API_PORT}"
+    f"{API_INFO['docs_url']}"
 )
+app = FastAPI(**API_INFO)
 
+app.add_middleware(**CORS_CONFIG)
+app.exception_handler(HTTPException)(ExceptionHandlers.http)
+app.exception_handler(404)(ExceptionHandlers.http)
+app.exception_handler(403)(ExceptionHandlers.http)
+app.exception_handler(401)(ExceptionHandlers.http)
+app.exception_handler(RequestValidationError)(ExceptionHandlers.validation)
+app.exception_handler(Exception)(ExceptionHandlers.unknown)
 
-@app.exception_handler(APIError)
-async def http_exception_handler(request: Request, exc: HTTPException):
-    return JSONResponse(
-        status_code=exc.status_code,
-        content=exc.detail,
-    )
-
-
-@app.exception_handler(404)
-async def exception_404_handler(request: Request, exc: HTTPException):
-    if exc.detail == 'Not Found':
-        return JSONResponse(
-            status_code=exc.status_code,
-            content={'error': 'Not Found'},
-        )
-    return JSONResponse(
-        status_code=exc.status_code,
-        content=exc.detail,
-    )
-
-
-@app.exception_handler(403)
-async def exception_403_handler(request: Request, exc: HTTPException):
-    try:
-        exc.detail['error']
-        return JSONResponse(
-            status_code=exc.status_code,
-            content=exc.detail,
-        )
-    except (KeyError, TypeError):
-        return JSONResponse(
-            status_code=exc.status_code,
-            content={'error': 'No authorization header'},
-        )
-
-
-@app.exception_handler(RequestValidationError)
-async def validation_handler(request: Request, exc: RequestValidationError):
-    return JSONResponse(
-        status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-        content={"error": "Unprocessable Entity"}
-    )
+app.include_router(users.router)
