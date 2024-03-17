@@ -13,7 +13,7 @@ class UserLoginRequest(BaseModel):
     )
 
 
-class UserCreateRequest(UserLoginRequest):
+class UserCreateRequest(BaseModel):
     username: str = Field(
         description="The username of the user", examples=["user"]
     )

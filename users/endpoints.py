@@ -1,14 +1,17 @@
+from typing import Annotated
+
 from fastapi import APIRouter, Cookie, HTTPException
 from fastapi.responses import JSONResponse
+
+from general.schemas import BasicResponse, ErrorResponse
+
+from .methods import User
 from .schemas import (
-    UserLoginRequest,
     UserCreateRequest,
+    UserLoginRequest,
     UserReadResponse,
     UserUpdateRequest,
 )
-from general.schemas import BasicResponse, ErrorResponse
-from .methods import User
-from typing import Annotated
 
 router = APIRouter(prefix="/users", tags=["User"])
 
@@ -20,7 +23,7 @@ router = APIRouter(prefix="/users", tags=["User"])
         200: {"model": BasicResponse},
         401: {"model": ErrorResponse},
         422: {"model": ErrorResponse},
-    }
+    },
 )
 async def user_login(user: UserLoginRequest) -> BasicResponse:
     """
@@ -43,7 +46,7 @@ async def user_login(user: UserLoginRequest) -> BasicResponse:
         200: {"model": BasicResponse},
         409: {"model": ErrorResponse},
         422: {"model": ErrorResponse},
-    }
+    },
 )
 async def user_create(user: UserCreateRequest) -> BasicResponse:
     """
@@ -64,7 +67,7 @@ async def user_create(user: UserCreateRequest) -> BasicResponse:
         200: {"model": BasicResponse},
         404: {"model": ErrorResponse},
         422: {"model": ErrorResponse},
-    }
+    },
 )
 async def user_confirm(token: str) -> BasicResponse:
     """
@@ -74,7 +77,7 @@ async def user_confirm(token: str) -> BasicResponse:
     Returns:
         BasicResponse: The response
     """
-    auth = User.authorize(token)
+    auth = await User.authorize(token)
     if auth.role != "new_user":
         raise HTTPException(409, "User already confirmed")
     await User.confirm(token)
@@ -87,7 +90,7 @@ async def user_confirm(token: str) -> BasicResponse:
     responses={
         200: {"model": list[UserReadResponse]},
         422: {"model": ErrorResponse},
-    }
+    },
 )
 async def user_search(query: str = "") -> list[UserReadResponse]:
     """
@@ -106,7 +109,7 @@ async def user_search(query: str = "") -> list[UserReadResponse]:
     responses={
         200: {"model": UserReadResponse},
         404: {"model": ErrorResponse},
-    }
+    },
 )
 async def user_read(user_id: int) -> UserReadResponse:
     """
@@ -127,10 +130,12 @@ async def user_read(user_id: int) -> UserReadResponse:
         403: {"model": ErrorResponse},
         404: {"model": ErrorResponse},
         422: {"model": ErrorResponse},
-    }
+    },
 )
 async def user_update(
-    user_id: int, user: UserUpdateRequest, token: Annotated[str, Cookie] = ""
+    user_id: int,
+    user: UserUpdateRequest,
+    token: Annotated[str | None, Cookie()] = None,
 ) -> BasicResponse:
     """
     Update a user
@@ -143,6 +148,8 @@ async def user_update(
     auth = await User.authorize(token)
     if auth.role != "admin" and auth.id != user_id:
         raise HTTPException(403, "Unauthorized")
+    if auth.role != "admin" and user.role:
+        raise HTTPException(403, "Unauthorized")
     await User.update(user_id, user)
     return {"message": "User updated"}
 
@@ -154,10 +161,10 @@ async def user_update(
         200: {"model": BasicResponse},
         403: {"model": ErrorResponse},
         404: {"model": ErrorResponse},
-    }
+    },
 )
 async def user_delete(
-    user_id: int, token: Annotated[str, Cookie] = ""
+    user_id: int, token: Annotated[str | None, Cookie()] = None
 ) -> BasicResponse:
     """
     Delete a user

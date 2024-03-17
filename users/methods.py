@@ -1,6 +1,7 @@
 from fastapi import HTTPException
 
 from database.mariadb.connection import Connection
+from aiomysql import IntegrityError
 
 from .schemas import (
     UserLoginRequest,
@@ -82,7 +83,7 @@ class User:
             await cursor.execute(
                 "SELECT role FROM user WHERE id = %s", (user_data[0],)
             )
-            role = await cursor.fetchone()[0]
+            role = (await cursor.fetchone())[0]
             return UserAuth(id=user_data[0], role=role)
 
     @staticmethod
@@ -94,12 +95,18 @@ class User:
         """
         async with Connection() as conn:
             cursor = await conn.cursor()
-            await cursor.execute(
-                "INSERT INTO user "
-                "(username, password, email, role, created_at, updated_at) "
-                "VALUES (%s, %s, %s, 'new_user', NOW(), NOW())",
-                (user.username, hash_value(user.password), user.email),
-            )
+            try:
+                await cursor.execute(
+                    "INSERT INTO user "
+                    "(username, password, email, role, created_at, updated_at) "
+                    "VALUES (%s, %s, %s, 'new_user', NOW(), NOW())",
+                    (user.username, hash_value(user.password), user.email),
+                )
+            except IntegrityError as e:
+                if "username" in e.args[1]:
+                    raise HTTPException(409, "Username already exists")
+                if "email" in e.args[1]:
+                    raise HTTPException(409, "Email already exists")
             token = generate_token()
             await cursor.execute(
                 "INSERT INTO session (user_id, token, expiration) "
@@ -140,7 +147,7 @@ class User:
             cursor = await conn.cursor()
             await cursor.execute(
                 "SELECT id, username, role, profile_picture "
-                "FROM user WHERE username LIKE %s",
+                "FROM user WHERE username LIKE %s ORDER BY id",
                 (f"%{query}%",),
             )
             user_data = await cursor.fetchall()
@@ -190,24 +197,30 @@ class User:
         """
         async with Connection() as conn:
             cursor = await conn.cursor()
-            await cursor.execute(
-                "UPDATE user SET "
-                "username = COALESCE(%s, username), "
-                "password = COALESCE(%s, password), "
-                "email = COALESCE(%s, email), "
-                "role = COALESCE(%s, role), "
-                "profile_picture = COALESCE(%s, profile_picture), "
-                "updated_at = NOW() "
-                "WHERE id = %s",
-                (
-                    user.username,
-                    hash_value(user.password) if user.password else None,
-                    user.email,
-                    user.role,
-                    user.profile_picture,
-                    user_id,
-                ),
-            )
+            try:
+                await cursor.execute(
+                    "UPDATE user SET "
+                    "username = COALESCE(%s, username), "
+                    "password = COALESCE(%s, password), "
+                    "email = COALESCE(%s, email), "
+                    "role = COALESCE(%s, role), "
+                    "profile_picture = COALESCE(%s, profile_picture), "
+                    "updated_at = NOW() "
+                    "WHERE id = %s",
+                    (
+                        user.username,
+                        hash_value(user.password) if user.password else None,
+                        user.email,
+                        user.role,
+                        user.profile_picture,
+                        user_id,
+                    ),
+                )
+            except IntegrityError as e:
+                if "username" in e.args[1]:
+                    raise HTTPException(409, "Username already exists")
+                if "email" in e.args[1]:
+                    raise HTTPException(409, "Email already exists")
             if cursor.rowcount == 0:
                 raise HTTPException(404, "User not found")
 
